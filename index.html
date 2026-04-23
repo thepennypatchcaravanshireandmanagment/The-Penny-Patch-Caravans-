@@ -1,60 +1,90 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Penny Patch Caravans</title>
-
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js"></script>
-
-  <!-- EmailJS -->
-  <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+  <title>The Penny Patch</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
-    body { font-family: Arial; margin:0; background:#f5f7fa; }
-    header { background:#0d3b66; color:white; padding:20px; text-align:center; }
-    .container { padding:20px; max-width:1100px; margin:auto; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: #f7f3ec;
+      color: #2f4f4f;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 40px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    header h1 {
+      margin: 0;
+      color: #2f7f7f;
+    }
+
+    .hero {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 60px 40px;
+      flex-wrap: wrap;
+    }
+
+    .hero-text {
+      max-width: 500px;
+    }
+
+    .hero h2 {
+      font-size: 60px;
+      line-height: 1.1;
+      color: #2f7f7f;
+    }
+
+    .hero p {
+      font-size: 18px;
+      margin: 20px 0;
+    }
+
+    .hero button {
+      background: #3f8f8f;
+      color: white;
+      padding: 15px 25px;
+      border: none;
+      border-radius: 30px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .hero img {
+      max-width: 400px;
+      border-radius: 20px;
+    }
+
+    .section {
+      padding: 40px;
+      text-align: center;
+    }
 
     .card {
-      background:white;
-      padding:15px;
-      margin:15px 0;
-      border-radius:10px;
-      box-shadow:0 4px 10px rgba(0,0,0,0.1);
+      background: white;
+      padding: 20px;
+      margin: 20px auto;
+      max-width: 400px;
+      border-radius: 15px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
     }
-
-    img { width:100%; max-width:400px; border-radius:10px; }
 
     input, select {
-      width:100%;
-      padding:10px;
-      margin:8px 0;
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
     }
 
-    button {
-      background:#e63946;
-      color:white;
-      padding:10px;
-      border:none;
-      border-radius:5px;
-      cursor:pointer;
-    }
-
-    .admin {
-      background:#fff3cd;
-      padding:15px;
-      margin-bottom:20px;
-      border-radius:10px;
-    }
-
-    #confirmation {
-      display:none;
-      background:white;
-      padding:20px;
-      border-radius:10px;
-      margin-top:20px;
-      text-align:center;
+    button.book {
+      background: #e76f51;
     }
   </style>
 </head>
@@ -62,157 +92,65 @@
 <body>
 
 <header>
-  <h1>Penny Patch Caravans</h1>
+  <h1>The Penny Patch</h1>
+  <span>Caravan Hire & Management</span>
 </header>
 
-<div class="container">
+<section class="hero">
+  <div class="hero-text">
+    <h2>Simple joys on a shiny little budget.</h2>
+    <p>Cosy static caravan breaks, hand-picked by The Penny Patch.</p>
+    <button onclick="scrollToCaravans()">Browse caravans →</button>
+  </div>
 
-<!-- ADMIN PANEL -->
-<div class="admin">
-  <h2>Admin Panel</h2>
-  <input id="name" placeholder="Caravan name">
-  <input id="price" placeholder="Price per night (£)">
-  <input type="file" id="image">
-  <button onclick="addCaravan()">Add Caravan</button>
-</div>
+  <img src="https://images.unsplash.com/photo-1505691938895-1758d7feb511">
+</section>
 
-<h2>Available Caravans</h2>
-<div id="caravans"></div>
+<section class="section" id="caravans">
+  <h2>Our caravans</h2>
 
-<!-- CONFIRMATION -->
-<div id="confirmation">
-  <h2>✅ Booking Confirmed</h2>
-  <p id="confName"></p>
-  <p id="confCaravan"></p>
-  <p id="confNights"></p>
-  <p id="confPets"></p>
-  <h3 id="confTotal"></h3>
-</div>
+  <div class="card">
+    <h3>Penny Patch</h3>
+    <p>£80 per night</p>
 
-</div>
+    <input id="name" placeholder="Your Name">
+    <input id="email" placeholder="Your Email">
+    <input id="nights" placeholder="Nights">
+
+    <label>Pets?</label>
+    <select id="pets" onchange="togglePets()">
+      <option>No</option>
+      <option>Yes</option>
+    </select>
+
+    <div id="petBox" style="display:none;">
+      <input id="dogs" placeholder="Number of dogs">
+      <input id="breed" placeholder="Breed">
+    </div>
+
+    <button class="book" onclick="book()">Book Now</button>
+  </div>
+
+</section>
 
 <script>
-
-/* 🔑 ADD YOUR FIREBASE CONFIG */
-const firebaseConfig = {
-  apiKey: "YOUR_KEY",
-  authDomain: "YOUR_DOMAIN",
-  projectId: "YOUR_ID",
-  storageBucket: "YOUR_BUCKET",
-  appId: "YOUR_APP_ID"
-};
-
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-const storage = firebase.storage();
-
-/* 📧 EMAILJS */
-emailjs.init("YOUR_PUBLIC_KEY");
-
-/* ➕ ADD CARAVAN */
-async function addCaravan() {
-  const name = document.getElementById("name").value;
-  const price = document.getElementById("price").value;
-  const file = document.getElementById("image").files[0];
-
-  const ref = storage.ref("images/" + file.name);
-  await ref.put(file);
-  const imageUrl = await ref.getDownloadURL();
-
-  await db.collection("caravans").add({ name, price, imageUrl });
-
-  alert("Caravan added!");
-  loadCaravans();
+function scrollToCaravans() {
+  document.getElementById("caravans").scrollIntoView({ behavior: "smooth" });
 }
 
-/* 📥 LOAD CARAVANS */
-async function loadCaravans() {
-  const container = document.getElementById("caravans");
-  container.innerHTML = "";
-
-  const snapshot = await db.collection("caravans").get();
-
-  snapshot.forEach(doc => {
-    const c = doc.data();
-
-    container.innerHTML += `
-      <div class="card">
-        <h3>${c.name}</h3>
-        <img src="${c.imageUrl}">
-        <p>£${c.price} per night</p>
-
-        <input id="cust-${doc.id}" placeholder="Your Name">
-        <input id="email-${doc.id}" placeholder="Your Email">
-
-        <input type="number" id="nights-${doc.id}" placeholder="Nights">
-
-        <label>Bringing pets?</label>
-        <select onchange="togglePets('${doc.id}', this.value)">
-          <option>No</option>
-          <option>Yes</option>
-        </select>
-
-        <div id="pets-${doc.id}" style="display:none;">
-          <input type="number" id="dogs-${doc.id}" placeholder="Number of dogs">
-          <input type="text" id="breed-${doc.id}" placeholder="Breed(s)">
-        </div>
-
-        <button onclick="book('${doc.id}', '${c.name}', ${c.price})">Book</button>
-      </div>
-    `;
-  });
+function togglePets() {
+  document.getElementById("petBox").style.display =
+    document.getElementById("pets").value === "Yes" ? "block" : "none";
 }
 
-/* 🐶 PET TOGGLE */
-function togglePets(id, val) {
-  document.getElementById("pets-" + id).style.display =
-    val === "Yes" ? "block" : "none";
+function book() {
+  const nights = document.getElementById("nights").value || 0;
+  const dogs = document.getElementById("dogs").value || 0;
+
+  const total = (nights * 80) + (dogs * 15);
+
+  alert("Total: £" + total);
 }
-
-/* 💰 BOOKING */
-async function book(id, caravanName, price) {
-
-  const name = document.getElementById("cust-" + id).value;
-  const email = document.getElementById("email-" + id).value;
-  const nights = document.getElementById("nights-" + id).value || 0;
-  const dogs = document.getElementById("dogs-" + id)?.value || 0;
-  const breed = document.getElementById("breed-" + id)?.value || "None";
-
-  const total = (nights * price) + (dogs * 15);
-
-  /* SAVE */
-  await db.collection("bookings").add({
-    name, email, caravanName, nights, dogs, breed, total
-  });
-
-  const params = {
-    name,
-    email,
-    caravan: caravanName,
-    nights,
-    dogs,
-    breed,
-    total
-  };
-
-  /* EMAILS */
-  emailjs.send("YOUR_SERVICE_ID", "YOUR_TEMPLATE_ADMIN", params);
-  emailjs.send("YOUR_SERVICE_ID", "YOUR_TEMPLATE_CUSTOMER", params);
-
-  /* SHOW CONFIRMATION */
-  document.getElementById("caravans").style.display = "none";
-  document.getElementById("confirmation").style.display = "block";
-
-  document.getElementById("confName").innerText = "Name: " + name;
-  document.getElementById("confCaravan").innerText = "Caravan: " + caravanName;
-  document.getElementById("confNights").innerText = "Nights: " + nights;
-  document.getElementById("confPets").innerText = "Dogs: " + dogs + " (" + breed + ")";
-  document.getElementById("confTotal").innerText = "Total: £" + total;
-}
-
-/* LOAD */
-loadCaravans();
-
 </script>
 
 </body>
