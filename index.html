@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Penny Patch Caravans</title>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js"></script>
+
+  <!-- EmailJS -->
+  <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+
+  <style>
+    body { font-family: Arial; margin:0; background:#f5f7fa; }
+    header { background:#0d3b66; color:white; padding:20px; text-align:center; }
+    .container { padding:20px; max-width:1100px; margin:auto; }
+
+    .card {
+      background:white;
+      padding:15px;
+      margin:15px 0;
+      border-radius:10px;
+      box-shadow:0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    img { width:100%; max-width:400px; border-radius:10px; }
+
+    input, select {
+      width:100%;
+      padding:10px;
+      margin:8px 0;
+    }
+
+    button {
+      background:#e63946;
+      color:white;
+      padding:10px;
+      border:none;
+      border-radius:5px;
+      cursor:pointer;
+    }
+
+    .admin {
+      background:#fff3cd;
+      padding:15px;
+      margin-bottom:20px;
+      border-radius:10px;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>Penny Patch Caravans</h1>
+</header>
+
+<div class="container">
+
+<!-- ADMIN PANEL -->
+<div class="admin">
+  <h2>Admin Panel</h2>
+  <input id="name" placeholder="Caravan name">
+  <input id="price" placeholder="Price per night (£)">
+  <input type="file" id="image">
+  <button onclick="addCaravan()">Add Caravan</button>
+</div>
+
+<h2>Available Caravans</h2>
+<div id="caravans"></div>
+
+</div>
+
+<script>
+
+/* 🔑 FIREBASE CONFIG (PASTE YOURS HERE) */
+const firebaseConfig = {
+  apiKey: "YOUR_KEY",
+  authDomain: "YOUR_DOMAIN",
+  projectId: "YOUR_ID",
+  storageBucket: "YOUR_BUCKET",
+  appId: "YOUR_APP_ID"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+/* 📧 EMAILJS INIT */
+emailjs.init("YOUR_PUBLIC_KEY");
+
+/* ➕ ADD CARAVAN */
+async function addCaravan() {
+  const name = document.getElementById("name").value;
+  const price = document.getElementById("price").value;
+  const file = document.getElementById("image").files[0];
+
+  const ref = storage.ref("images/" + file.name);
+  await ref.put(file);
+  const imageUrl = await ref.getDownloadURL();
+
+  await db.collection("caravans").add({ name, price, imageUrl });
+
+  alert("Caravan added!");
+  loadCaravans();
+}
+
+/* 📥 LOAD CARAVANS */
+async function loadCaravans() {
+  const container = document.getElementById("caravans");
+  container.innerHTML = "";
+
+  const snapshot = await db.collection("caravans").get();
+
+  snapshot.forEach(doc => {
+    const c = doc.data();
+
+    container.innerHTML += `
+      <div class="card">
+        <h3>${c.name}</h3>
+        <img src="${c.imageUrl}">
+        <p>£${c.price} per night</p>
+
+        <input id="name-${doc.id}" placeholder="Your Name">
+        <input id="email-${doc.id}" placeholder="Your Email">
+
+        <input type="number" id="nights-${doc.id}" placeholder="Number of nights">
+
+        <label>Bringing pets?</label>
+        <select onchange="togglePets('${doc.id}', this.value)">
+          <option>No</option>
+          <option>Yes</option>
+        </select>
+
+        <div id="pets-${doc.id}" style="display:none;">
+          <input type="number" id="dogs-${doc.id}" placeholder="Number of dogs">
+          <input type="text" id="breed-${doc.id}" placeholder="Breed(s)">
+        </div>
+
+        <button onclick="book('${doc.id}', '${c.name}', ${c.price})">Book Now</button>
+      </div>
+    `;
+  });
+}
+
+/* 🐶 TOGGLE PETS */
+function togglePets(id, val) {
+  document.getElementById("pets-" + id).style.display =
+    val === "Yes" ? "block" : "none";
+}
+
+/* 💰 BOOKING + EMAIL */
+async function book(id, caravanName, price) {
+
+  const name = document.getElementById("name-" + id).value;
+  const email = document.getElementById("email-" + id).value;
+  const nights = document.getElementById("nights-" + id).value || 0;
+  const dogs = document.getElementById("dogs-" + id)?.value || 0;
+  const breed = document.getElementById("breed-" + id)?.value || "None";
+
+  const total = (nights * price) + (dogs * 15);
+
+  /* SAVE BOOKING */
+  await db.collection("bookings").add({
+    name, email, caravanName, nights, dogs, breed, total
+  });
+
+  const params = {
+    name,
+    email,
+    caravan: caravanName,
+    nights,
+    dogs,
+    breed,
+    total
+  };
+
+  /* EMAIL TO YOU */
+  emailjs.send("YOUR_SERVICE_ID", "YOUR_TEMPLATE_ADMIN", params);
+
+  /* EMAIL TO CUSTOMER */
+  emailjs.send("YOUR_SERVICE_ID", "YOUR_TEMPLATE_CUSTOMER", params);
+
+  alert("Booking confirmed! Email sent.");
+}
+
+/* LOAD ON START */
+loadCaravans();
+
+</script>
+
+</body>
+</html>
