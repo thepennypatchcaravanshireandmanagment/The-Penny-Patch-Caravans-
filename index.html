@@ -1,196 +1,219 @@
-import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import SiteHeader from "@/components/SiteHeader";
-import SiteFooter from "@/components/SiteFooter";
-import { Button } from "@/components/ui/button";
-import { CheckCircle2, CalendarDays, Users, PawPrint, Home, MapPin } from "lucide-react";
-import { STAY_LABELS, fmtDate, type StayType } from "@/lib/stayRules";
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Penny Patch Caravans</title>
 
-type Booking = {
-  id: string;
-  caravan_id: string;
-  stay_type: StayType;
-  check_in: string;
-  check_out: string;
-  lead_name: string;
-  lead_email: string;
-  lead_phone: string;
-  guests: number;
-  pets: number;
-  notes: string | null;
-  total_pence: number;
-  status: string;
-  caravan?: { name: string; slug: string } | null;
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js"></script>
+
+  <!-- EmailJS -->
+  <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+
+  <style>
+    body { font-family: Arial; margin:0; background:#f5f7fa; }
+    header { background:#0d3b66; color:white; padding:20px; text-align:center; }
+    .container { padding:20px; max-width:1100px; margin:auto; }
+
+    .card {
+      background:white;
+      padding:15px;
+      margin:15px 0;
+      border-radius:10px;
+      box-shadow:0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    img { width:100%; max-width:400px; border-radius:10px; }
+
+    input, select {
+      width:100%;
+      padding:10px;
+      margin:8px 0;
+    }
+
+    button {
+      background:#e63946;
+      color:white;
+      padding:10px;
+      border:none;
+      border-radius:5px;
+      cursor:pointer;
+    }
+
+    .admin {
+      background:#fff3cd;
+      padding:15px;
+      margin-bottom:20px;
+      border-radius:10px;
+    }
+
+    #confirmation {
+      display:none;
+      background:white;
+      padding:20px;
+      border-radius:10px;
+      margin-top:20px;
+      text-align:center;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>Penny Patch Caravans</h1>
+</header>
+
+<div class="container">
+
+<!-- ADMIN PANEL -->
+<div class="admin">
+  <h2>Admin Panel</h2>
+  <input id="name" placeholder="Caravan name">
+  <input id="price" placeholder="Price per night (£)">
+  <input type="file" id="image">
+  <button onclick="addCaravan()">Add Caravan</button>
+</div>
+
+<h2>Available Caravans</h2>
+<div id="caravans"></div>
+
+<!-- CONFIRMATION -->
+<div id="confirmation">
+  <h2>✅ Booking Confirmed</h2>
+  <p id="confName"></p>
+  <p id="confCaravan"></p>
+  <p id="confNights"></p>
+  <p id="confPets"></p>
+  <h3 id="confTotal"></h3>
+</div>
+
+</div>
+
+<script>
+
+/* 🔑 ADD YOUR FIREBASE CONFIG */
+const firebaseConfig = {
+  apiKey: "YOUR_KEY",
+  authDomain: "YOUR_DOMAIN",
+  projectId: "YOUR_ID",
+  storageBucket: "YOUR_BUCKET",
+  appId: "YOUR_APP_ID"
 };
 
-export default function BookingConfirmation() {
-  const { id = "" } = useParams();
-  const [booking, setBooking] = useState<Booking | null>(null);
-  const [loading, setLoading] = useState(true);
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const storage = firebase.storage();
 
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase
-        .from("bookings")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
-      if (data) {
-        const { data: c } = await supabase
-          .from("caravans")
-          .select("name,slug")
-          .eq("id", data.caravan_id)
-          .maybeSingle();
-        setBooking({ ...(data as any), caravan: c });
-        document.title = `Booking confirmed | The Penny Patch`;
-      }
-      setLoading(false);
-    })();
-  }, [id]);
+/* 📧 EMAILJS */
+emailjs.init("YOUR_PUBLIC_KEY");
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <SiteHeader />
-        <div className="container py-20 text-center text-muted-foreground">Loading booking…</div>
-      </div>
-    );
-  }
+/* ➕ ADD CARAVAN */
+async function addCaravan() {
+  const name = document.getElementById("name").value;
+  const price = document.getElementById("price").value;
+  const file = document.getElementById("image").files[0];
 
-  if (!booking) {
-    return (
-      <div className="min-h-screen bg-background">
-        <SiteHeader />
-        <section className="container max-w-xl py-20 text-center">
-          <h1 className="font-serif text-2xl font-semibold text-primary">Booking not found</h1>
-          <p className="mt-2 text-muted-foreground">We couldn't find that booking reference.</p>
-          <Button asChild className="mt-6"><Link to="/">Back to home</Link></Button>
-        </section>
-        <SiteFooter />
-      </div>
-    );
-  }
+  const ref = storage.ref("images/" + file.name);
+  await ref.put(file);
+  const imageUrl = await ref.getDownloadURL();
 
-  const checkIn = new Date(booking.check_in);
-  const checkOut = new Date(booking.check_out);
-  const nights = Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
-  const ref = booking.id.slice(0, 8).toUpperCase();
+  await db.collection("caravans").add({ name, price, imageUrl });
 
-  return (
-    <div className="min-h-screen bg-background">
-      <SiteHeader />
-
-      <section className="container max-w-2xl py-10 md:py-14">
-        {/* Hero */}
-        <div className="text-center">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary/15">
-            <CheckCircle2 className="h-10 w-10 text-primary" />
-          </div>
-          <h1 className="mt-5 font-serif text-3xl font-semibold text-primary md:text-4xl">
-            You're booked in!
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            Thanks {booking.lead_name.split(" ")[0]} — your stay at{" "}
-            <strong>{booking.caravan?.name ?? "your caravan"}</strong> is confirmed.
-          </p>
-          <p className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">
-            Reference <span className="font-mono text-foreground">{ref}</span>
-          </p>
-        </div>
-
-        {/* Summary card */}
-        <div className="mt-8 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm">
-          <div className="border-b border-border/60 bg-muted/40 px-5 py-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-primary">
-              <Home className="h-4 w-4" />
-              {booking.caravan?.name}
-            </div>
-          </div>
-
-          <div className="grid gap-4 p-5 sm:grid-cols-2">
-            <Row icon={<CalendarDays className="h-4 w-4" />} label="Check-in">
-              {fmtDate(checkIn)}
-            </Row>
-            <Row icon={<CalendarDays className="h-4 w-4" />} label="Check-out">
-              {fmtDate(checkOut)}
-            </Row>
-            <Row icon={<MapPin className="h-4 w-4" />} label="Stay type">
-              {STAY_LABELS[booking.stay_type]} · {nights} night{nights === 1 ? "" : "s"}
-            </Row>
-            <Row icon={<Users className="h-4 w-4" />} label="Guests">
-              {booking.guests}
-            </Row>
-            {booking.pets > 0 && (
-              <Row icon={<PawPrint className="h-4 w-4" />} label="Pets">
-                {booking.pets}
-              </Row>
-            )}
-          </div>
-
-          {booking.notes && (
-            <div className="border-t border-border/60 px-5 py-4">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">Your notes</div>
-              <p className="mt-1 text-sm">{booking.notes}</p>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between border-t border-border/60 bg-muted/40 px-5 py-4">
-            <div>
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">Total paid on arrival</div>
-              <div className="font-serif text-2xl font-semibold text-primary">
-                £{(booking.total_pence / 100).toFixed(2)}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Lead guest */}
-        <div className="mt-6 rounded-2xl border border-border/60 bg-card p-5">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">Lead guest</div>
-          <div className="mt-1 font-medium">{booking.lead_name}</div>
-          <div className="text-sm text-muted-foreground">{booking.lead_email}</div>
-          <div className="text-sm text-muted-foreground">{booking.lead_phone}</div>
-        </div>
-
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-          <Button asChild variant="outline">
-            <Link to="/">Back to home</Link>
-          </Button>
-          {booking.caravan?.slug && (
-            <Button asChild>
-              <Link to={`/caravan/${booking.caravan.slug}`}>View caravan</Link>
-            </Button>
-          )}
-        </div>
-
-        <p className="mt-8 text-center text-xs text-muted-foreground">
-          Please save your reference <span className="font-mono">{ref}</span> for any enquiries.
-        </p>
-      </section>
-
-      <SiteFooter />
-    </div>
-  );
+  alert("Caravan added!");
+  loadCaravans();
 }
 
-function Row({
-  icon,
-  label,
-  children,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground">
-        {icon}
-        {label}
+/* 📥 LOAD CARAVANS */
+async function loadCaravans() {
+  const container = document.getElementById("caravans");
+  container.innerHTML = "";
+
+  const snapshot = await db.collection("caravans").get();
+
+  snapshot.forEach(doc => {
+    const c = doc.data();
+
+    container.innerHTML += `
+      <div class="card">
+        <h3>${c.name}</h3>
+        <img src="${c.imageUrl}">
+        <p>£${c.price} per night</p>
+
+        <input id="cust-${doc.id}" placeholder="Your Name">
+        <input id="email-${doc.id}" placeholder="Your Email">
+
+        <input type="number" id="nights-${doc.id}" placeholder="Nights">
+
+        <label>Bringing pets?</label>
+        <select onchange="togglePets('${doc.id}', this.value)">
+          <option>No</option>
+          <option>Yes</option>
+        </select>
+
+        <div id="pets-${doc.id}" style="display:none;">
+          <input type="number" id="dogs-${doc.id}" placeholder="Number of dogs">
+          <input type="text" id="breed-${doc.id}" placeholder="Breed(s)">
+        </div>
+
+        <button onclick="book('${doc.id}', '${c.name}', ${c.price})">Book</button>
       </div>
-      <div className="mt-1 text-sm font-medium">{children}</div>
-    </div>
-  );
+    `;
+  });
 }
 
+/* 🐶 PET TOGGLE */
+function togglePets(id, val) {
+  document.getElementById("pets-" + id).style.display =
+    val === "Yes" ? "block" : "none";
+}
+
+/* 💰 BOOKING */
+async function book(id, caravanName, price) {
+
+  const name = document.getElementById("cust-" + id).value;
+  const email = document.getElementById("email-" + id).value;
+  const nights = document.getElementById("nights-" + id).value || 0;
+  const dogs = document.getElementById("dogs-" + id)?.value || 0;
+  const breed = document.getElementById("breed-" + id)?.value || "None";
+
+  const total = (nights * price) + (dogs * 15);
+
+  /* SAVE */
+  await db.collection("bookings").add({
+    name, email, caravanName, nights, dogs, breed, total
+  });
+
+  const params = {
+    name,
+    email,
+    caravan: caravanName,
+    nights,
+    dogs,
+    breed,
+    total
+  };
+
+  /* EMAILS */
+  emailjs.send("YOUR_SERVICE_ID", "YOUR_TEMPLATE_ADMIN", params);
+  emailjs.send("YOUR_SERVICE_ID", "YOUR_TEMPLATE_CUSTOMER", params);
+
+  /* SHOW CONFIRMATION */
+  document.getElementById("caravans").style.display = "none";
+  document.getElementById("confirmation").style.display = "block";
+
+  document.getElementById("confName").innerText = "Name: " + name;
+  document.getElementById("confCaravan").innerText = "Caravan: " + caravanName;
+  document.getElementById("confNights").innerText = "Nights: " + nights;
+  document.getElementById("confPets").innerText = "Dogs: " + dogs + " (" + breed + ")";
+  document.getElementById("confTotal").innerText = "Total: £" + total;
+}
+
+/* LOAD */
+loadCaravans();
+
+</script>
+
+</body>
+</html>
